@@ -87,11 +87,12 @@ const CableLayout3D = ({
     // Доводим до самого края площадки перед опуском на ступени
     const finalPlatformZ = -(platformLength - margin);
     const lastPlatformPoint = points[points.length - 1];
-    
-    // Если мы не у края, доводим кабель до края площадки
-    if (Math.abs(lastPlatformPoint[2] - finalPlatformZ) > 0.01) {
+
+    // Если мы не у края (или площадки нет вовсе), доводим кабель до края площадки
+    if (!lastPlatformPoint || Math.abs(lastPlatformPoint[2] - finalPlatformZ) > 0.01) {
       points.push([lastX, platformHeight + 0.03, finalPlatformZ]);
     }
+
     
     // СТУПЕНИ (змейкой, спускаемся вниз)
     for (let i = 0; i < stepCount; i++) {
@@ -100,7 +101,7 @@ const CableLayout3D = ({
       const threadSpacing = stepWidth / (threadsPerStep + 1);
       
       // Вертикальный опуск с предыдущей поверхности
-      const prevZ = points[points.length - 1][2];
+      const prevZ = points[points.length - 1]?.[2] ?? -(platformLength - margin);
       const firstThreadZ = stepZ - threadSpacing;
       
       // Опускаемся по вертикали и горизонтали до первой нитки
