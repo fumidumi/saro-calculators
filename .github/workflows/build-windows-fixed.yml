@@ -1,0 +1,118 @@
+name: Build Windows installer fixed
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "package.json"
+      - "package-lock.json"
+      - "electron-main.cjs"
+      - "vite.config.ts"
+      - "src/**"
+      - "public/**"
+      - "scripts/**"
+      - ".github/workflows/build-windows-fixed.yml"
+
+jobs:
+  build-windows:
+    name: Build Windows NSIS installer
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Build web app
+        run: npm run build:desktop
+
+
+      - name: Show build output folders
+        shell: pwsh
+        run: |
+          Write-Host "Root files:"
+          Get-ChildItem -Force
+          Write-Host "Possible build folders:"
+          Get-ChildItem -Force -Directory | Where-Object { $_.Name -in @('.output','dist','build','out','.vinxi') } | ForEach-Object {
+            Write-Host "--- $($_.FullName)"
+            Get-ChildItem -Force -Recurse $_.FullName | Select-Object -First 80 | ForEach-Object { Write-Host $_.FullName }
+          }
+
+      - name: Prepare Electron output
+        shell: pwsh
+        run: |
+          if (Test-Path "electron-output") {
+            Remove-Item "electron-output" -Recurse -Force
+          }
+
+          if (Test-Path ".output") {
+            Copy-Item ".output" "electron-output" -Recurse -Force
+            Write-Host "Copied .output to electron-output"
+          } elseif (Test-Path "dist") {
+            New-Item -ItemType Directory -Force "electron-output/public" | Out-Null
+            Copy-Item "dist/*" "electron-output/public" -Recurse -Force
+            Write-Host "Copied dist to electron-output/public"
+          } else {
+            throw "No .output or dist folder found after npm run build"
+          }
+
+          Write-Host "Prepared electron-output:"
+          Get-ChildItem -Force -Recurse "electron-output" | Select-Object -First 120 | ForEach-Object { Write-Host $_.FullName }
+
+      - name: Create Electron output diagnostics
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force "diagnostics" | Out-Null
+          "=== ALL HTML/CSS/JS/MJS FILES ===" | Out-File "diagnostics/electron-output-diagnostics.txt" -Encoding utf8
+          Get-ChildItem -Force -Recurse "electron-output" -Include *.html,*.css,*.js,*.mjs | ForEach-Object { $_.FullName } | Out-File "diagnostics/electron-output-diagnostics.txt" -Append -Encoding utf8
+          "" | Out-File "diagnostics/electron-output-diagnostics.txt" -Append -Encoding utf8
+          "=== INDEX HTML FILES CONTENT ===" | Out-File "diagnostics/electron-output-diagnostics.txt" -Append -Encoding utf8
+          Get-ChildItem -Force -Recurse "electron-output" -Filter "index.html" | ForEach-Object {
+            "--- $($_.FullName) ---" | Out-File "diagnostics/electron-output-diagnostics.txt" -Append -Encoding utf8
+            Get-Content $_.FullName -Raw | Out-File "diagnostics/electron-output-diagnostics.txt" -Append -Encoding utf8
+          }
+
+      - name: Build Windows installer
+        run: npx electron-builder --win nsis --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: Prepare roof update metadata
+        shell: pwsh
+        run: |
+          if (Test-Path "release/latest.yml") {
+            Copy-Item "release/latest.yml" "release/latest-roof.yml" -Force
+          }
+          if (-not (Test-Path "release/latest-roof.yml")) {
+            throw "latest-roof.yml was not created"
+          }
+
+      - name: Show release files
+        shell: pwsh
+        run: Get-ChildItem -Recurse release
+
+      - name: Upload Windows installer artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: saro-roof-windows-installer
+          path: |
+            release/*.exe
+            release/*.blockmap
+            release/latest-roof.yml
+          if-no-files-found: error
+
+      - name: Upload diagnostics
+        uses: actions/upload-artifact@v4
+        with:
+          name: saro-roof-diagnostics
+          path: diagnostics/electron-output-diagnostics.txt
+          if-no-files-found: warn
