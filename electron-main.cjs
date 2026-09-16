@@ -192,41 +192,58 @@ function setupAutoUpdates() {
   if (!app.isPackaged) return;
 
   autoUpdater.channel = UPDATE_CHANNEL;
-  autoUpdater.autoDownload = true;
+  // Не запускаем фоновую проверку и загрузку автоматически. В Windows
+  // системное окно electron-updater может оказаться за главным окном и
+  // полностью перехватить мышь. Проверка остаётся доступна вручную в меню.
+  autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = true;
 
   autoUpdater.on('error', () => {
     // Ошибки обновления не должны мешать работе калькулятора.
   });
 
-  autoUpdater.on('update-downloaded', () => {
+  autoUpdater.on('update-available', () => {
     if (!mainWindow || mainWindow.isDestroyed()) return;
 
-    // Диалог всегда привязан к главному окну, иначе он может остаться
-    // за окном программы и Windows перестанет реагировать на мышь.
     dialog
       .showMessageBox(mainWindow, {
         type: 'info',
-        title: 'Обновление готово',
-        message: 'Загружена новая версия SARO системы обогрева.',
-        detail: 'Установить обновление при следующем запуске программы?',
-        buttons: ['Установить сейчас', 'Позже'],
+        title: 'Доступно обновление',
+        message: 'Доступна новая версия SARO системы обогрева.',
+        detail: 'Загрузить обновление сейчас?',
+        buttons: ['Загрузить', 'Позже'],
         defaultId: 1,
         cancelId: 1,
         noLink: true,
       })
       .then((result) => {
         if (result.response === 0) {
-          autoUpdater.quitAndInstall();
+          return autoUpdater.downloadUpdate();
         }
+        return undefined;
       })
       .catch(() => {});
   });
 
-  // Проверку обновлений запускаем с задержкой, чтобы она не мешала запуску окна.
-  setTimeout(() => {
-    autoUpdater.checkForUpdates().catch(() => {});
-  }, 8000);
+  autoUpdater.on('update-downloaded', () => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+
+    dialog
+      .showMessageBox(mainWindow, {
+        type: 'info',
+        title: 'Обновление готово',
+        message: 'Обновление загружено.',
+        detail: 'Установить его сейчас?',
+        buttons: ['Установить сейчас', 'Позже'],
+        defaultId: 1,
+        cancelId: 1,
+        noLink: true,
+      })
+      .then((result) => {
+        if (result.response === 0) autoUpdater.quitAndInstall();
+      })
+      .catch(() => {});
+  });
 }
 
 app.whenReady().then(() => {
