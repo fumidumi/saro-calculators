@@ -41,11 +41,17 @@ class Boundary extends Component<{ children: ReactNode }, { failed: boolean }> {
 export default function CableLayout3DLazy(props: Props) {
   return (
     <ClientOnly fallback={<Fallback />}>
-      <Boundary>
-        <Suspense fallback={<Fallback />}>
-          <CableLayout3D {...props} />
-        </Suspense>
-      </Boundary>
+      {window.location.protocol === "file:" ? (
+        <div className="flex h-[420px] items-center justify-center rounded-lg border border-border bg-muted/30 px-6 text-center text-sm text-muted-foreground">
+          В программе для Windows используйте 2D-схему. 3D-модель отключена для стабильной работы калькулятора.
+        </div>
+      ) : (
+        <Boundary>
+          <Suspense fallback={<Fallback />}>
+            <CableLayout3D {...props} />
+          </Suspense>
+        </Boundary>
+      )}
     </ClientOnly>
   );
 }
