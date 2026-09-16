@@ -39,19 +39,11 @@ jobs:
 
       - name: Build web app
         run: npm run build
+        env:
+          DESKTOP_BUILD: "1"
 
       - name: Prepare Electron output
-        shell: pwsh
-        run: |
-          if (Test-Path "electron-output") { Remove-Item "electron-output" -Recurse -Force }
-          if (Test-Path ".output") {
-            Copy-Item ".output" "electron-output" -Recurse -Force
-          } elseif (Test-Path "dist") {
-            New-Item -ItemType Directory -Force "electron-output/public" | Out-Null
-            Copy-Item "dist/*" "electron-output/public" -Recurse -Force
-          } else {
-            throw "No .output or dist folder found after npm run build"
-          }
+        run: npm run prepare:electron-output
 
       - name: Build Windows installer
         run: npx electron-builder --win nsis --publish never
