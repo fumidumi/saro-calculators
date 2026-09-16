@@ -2,9 +2,10 @@ import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import pkg from "../../package.json";
 
-type Env = "preview" | "published" | "dev";
+type Env = "preview" | "published" | "dev" | "desktop";
 
 function detectEnv(host: string): Env {
+  if (window.location.protocol === "file:") return "desktop";
   if (host.includes("id-preview") || host.endsWith(".lovableproject.com")) return "preview";
   if (host.endsWith(".lovable.app")) return "published";
   if (host === "localhost" || host === "127.0.0.1" || host.endsWith(".local")) return "dev";
@@ -15,6 +16,7 @@ const LABELS: Record<Env, { text: string; dot: string; variant: "secondary" | "d
   preview: { text: "Превью", dot: "bg-amber-500", variant: "secondary" },
   published: { text: "Опубликовано", dot: "bg-emerald-500", variant: "secondary" },
   dev: { text: "Локально", dot: "bg-sky-500", variant: "outline" },
+  desktop: { text: "Программа Windows", dot: "bg-violet-500", variant: "outline" },
 };
 
 export function BuildStatus({ className = "", forceEnv }: { className?: string; forceEnv?: Env }) {
