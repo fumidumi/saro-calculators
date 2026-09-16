@@ -84,3 +84,14 @@ jobs:
           name: saro-windows-installer-parts
           path: release-parts/**
           if-no-files-found: error
+
+      - name: Publish parts to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: windows-parts-${{ github.run_number }}
+          name: SARO Windows installer (parts) #${{ github.run_number }}
+          body: |
+            Части установщика Windows. Скачайте все файлы *.partNNN и join-parts.bat в одну папку и запустите join-parts.bat.
+          files: release-parts/**
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
