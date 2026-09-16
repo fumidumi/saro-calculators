@@ -24,6 +24,10 @@ jobs:
   build-windows-parts:
     name: Build and split Windows installer
     runs-on: windows-latest
+    permissions:
+      contents: write
+
+
 
     steps:
       - name: Checkout repository
