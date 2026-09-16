@@ -30,3 +30,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+dist-desktop
+electron-output
+release
+release-parts
