@@ -3,12 +3,15 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { HEATING_CABLES, THERMOSTATS, CONTROL_CABINETS, MOUNTING_TAPES } from "@/data/products";
 
+const fmtNum = (n: number) => Math.round(Number(n) || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, "\u00A0");
+
+
 const Catalog = () => {
   const formatPrice = (price: number) => {
     if (price === 0) {
       return "Цена по запросу";
     }
-    return `${price.toLocaleString('ru-RU')} ₽`;
+    return `${fmtNum(price)} ₽`;
   };
 
   return (
