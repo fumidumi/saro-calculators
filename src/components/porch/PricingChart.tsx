@@ -4,6 +4,9 @@ import { Info } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, ReferenceDot, ComposedChart } from "recharts";
 import { HEATING_CABLES } from "@/data/products";
 
+const fmtNum = (n: number) => Math.round(Number(n) || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, "\u00A0");
+
+
 interface PricingChartProps {
   platformLength: number;
   platformWidth: number;
@@ -81,7 +84,7 @@ const PricingChart = ({
       return (
         <div className="bg-card border border-border rounded-lg p-3 shadow-lg">
           <p className="text-sm font-medium">Площадь: {payload[0].payload.area.toFixed(1)} м²</p>
-          <p className="text-sm text-primary font-semibold">Стоимость: {payload[0].value.toLocaleString()} ₽</p>
+          <p className="text-sm text-primary font-semibold">Стоимость: {fmtNum(payload[0].value)} ₽</p>
           <p className="text-xs text-muted-foreground">Секция: {payload[0].payload.section}м</p>
         </div>
       );
@@ -199,7 +202,7 @@ const PricingChart = ({
           <div className="flex items-center justify-between text-sm">
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded-full bg-accent border-2 border-primary"></div>
-              <span className="text-muted-foreground">Ваши параметры: {currentArea.toFixed(1)} м² → {currentTotalPrice.toLocaleString()} ₽</span>
+              <span className="text-muted-foreground">Ваши параметры: {currentArea.toFixed(1)} м² → {fmtNum(currentTotalPrice)} ₽</span>
             </div>
           </div>
           <p className="text-xs text-muted-foreground">
