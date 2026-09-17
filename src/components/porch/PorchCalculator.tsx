@@ -19,6 +19,9 @@ import { Button } from "@/components/ui/button";
 import { type QuoteVariant, type QuoteData } from "@/lib/porch/generateQuote";
 import QuotePreviewDialog from "@/components/porch/QuotePreviewDialog";
 
+const fmtNum = (n: number) => Math.round(Number(n) || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, "\u00A0");
+
+
 // Границы валидных значений параметров
 const PARAM_LIMITS: Record<string, { min: number; max: number }> = {
   stepLength: { min: 0.5, max: 5 },
@@ -999,7 +1002,7 @@ const Calculator = () => {
                     <Separator className="bg-primary/30" />
                     <div className="flex justify-between items-center">
                       <span className="text-base font-medium">Стоимость кабелей:</span>
-                      <span className="text-2xl font-bold text-primary">{cablePrice.toLocaleString()} ₽</span>
+                      <span className="text-2xl font-bold text-primary">{fmtNum(cablePrice)} ₽</span>
                     </div>
                   </div>
 
@@ -1136,7 +1139,7 @@ const Calculator = () => {
               <CardContent className="space-y-4">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Нагревательный кабель:</span>
-                  <span className="font-medium">{cablePrice.toLocaleString()} ₽</span>
+                  <span className="font-medium">{fmtNum(cablePrice)} ₽</span>
                 </div>
                 
                 {/* Выбор системы управления */}
@@ -1169,7 +1172,7 @@ const Calculator = () => {
                             <span className="font-medium text-sm">Автоматически подобран:</span>
                           </div>
                           <p className="text-base font-bold">{selectedCabinet?.name}</p>
-                          <p className="text-lg font-bold text-primary">{(selectedCabinet?.price || 0).toLocaleString()} ₽</p>
+                          <p className="text-lg font-bold text-primary">{fmtNum(selectedCabinet?.price || 0)} ₽</p>
                           <p className="text-xs text-muted-foreground">
                             Расчёт нагрузки выполнен с учетом пусковых токов (+25% запаса)
                           </p>
@@ -1205,7 +1208,7 @@ const Calculator = () => {
                             <div className="flex justify-between border-t pt-1">
                               <span className="text-muted-foreground">Итого шкафов:</span>
                               <span className="font-bold text-emerald-700">
-                                {recommendedNumCircuits} × {recommendedCabinet.price.toLocaleString()} = {recommendedCabinetsTotalPrice.toLocaleString()} ₽
+                                {recommendedNumCircuits} × {fmtNum(recommendedCabinet.price)} = {fmtNum(recommendedCabinetsTotalPrice)} ₽
                               </span>
                             </div>
                           </div>
@@ -1235,7 +1238,7 @@ const Calculator = () => {
                                 {thermostat.name}
                               </Label>
                               <p className="text-xs text-muted-foreground">{thermostat.description}</p>
-                              <p className="text-sm font-bold text-primary mt-1">{thermostat.price.toLocaleString()} ₽</p>
+                              <p className="text-sm font-bold text-primary mt-1">{fmtNum(thermostat.price)} ₽</p>
                             </div>
                           </div>
                         ))}
@@ -1264,7 +1267,7 @@ const Calculator = () => {
                 <div className="space-y-1">
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Монтажная лента Fixtape (10м):</span>
-                    <span className="font-medium">{fixtapeRollsCount} шт × {FIXTAPE_PRICE_PER_ROLL.toLocaleString()} ₽</span>
+                    <span className="font-medium">{fixtapeRollsCount} шт × {fmtNum(FIXTAPE_PRICE_PER_ROLL)} ₽</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Крепёж ленты (дюбель-гвозди):</span>
@@ -1277,7 +1280,7 @@ const Calculator = () => {
                 <Separator />
                 <div className="flex justify-between pt-2">
                   <span className="font-semibold text-lg">Итого:</span>
-                  <span className="font-bold text-lg text-primary">{totalPrice.toLocaleString()} ₽</span>
+                  <span className="font-bold text-lg text-primary">{fmtNum(totalPrice)} ₽</span>
                 </div>
                 <p className="text-xs text-muted-foreground pt-2">
                   * Стоимость монтажных работ рассчитывается индивидуально
