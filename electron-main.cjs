@@ -2,12 +2,199 @@ const { app, BrowserWindow, Menu, dialog, shell } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
+const https = require('https');
+const crypto = require('crypto');
 
 const APP_NAME = 'SARO системы обогрева';
-const RELEASE_DATE = '16.09.2026';
+const RELEASE_DATE = '18.09.2026';
 const UPDATE_CHANNEL = 'latest-roof';
 
+// Автообновление напрямую из релизов GitHub: части установщика скачиваются
+// и склеиваются автоматически, пользователю не нужно ничего собирать вручную.
+const GITHUB_OWNER = 'fumidumi';
+const GITHUB_REPO = 'saro-calculators';
+
 let mainWindow = null;
+let githubUpdateBusy = false;
+
+function httpsGet(url, options = {}) {
+  return new Promise((resolve, reject) => {
+    const request = https.get(
+      url,
+      {
+        headers: {
+          'User-Agent': 'SARO-Updater',
+          Accept: options.accept || 'application/vnd.github+json',
+        },
+      },
+      (response) => {
+        const status = response.statusCode || 0;
+        if (status >= 300 && status < 400 && response.headers.location) {
+          response.resume();
+          resolve(httpsGet(response.headers.location, options));
+          return;
+        }
+        if (status !== 200) {
+          response.resume();
+          reject(new Error(`Сервер вернул код ${status} для ${url}`));
+          return;
+        }
+        const chunks = [];
+        response.on('data', (chunk) => chunks.push(chunk));
+        response.on('end', () => resolve(Buffer.concat(chunks)));
+        response.on('error', reject);
+      },
+    );
+    request.on('error', reject);
+    request.setTimeout(120000, () => request.destroy(new Error('Превышено время ожидания сервера')));
+  });
+}
+
+function compareVersions(a, b) {
+  const pa = String(a).replace(/^v/, '').split('.').map((x) => parseInt(x, 10) || 0);
+  const pb = String(b).replace(/^v/, '').split('.').map((x) => parseInt(x, 10) || 0);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i += 1) {
+    const diff = (pa[i] || 0) - (pb[i] || 0);
+    if (diff !== 0) return diff > 0 ? 1 : -1;
+  }
+  return 0;
+}
+
+async function updateFromGithub(win) {
+  if (githubUpdateBusy) return;
+  githubUpdateBusy = true;
+
+  try {
+    const releasesRaw = await httpsGet(
+      `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases?per_page=20`,
+    );
+    const releases = JSON.parse(releasesRaw.toString('utf8'));
+
+    let found = null;
+    for (const release of releases) {
+      if (release.draft) continue;
+      const assets = release.assets || [];
+      const manifest = assets.find((a) => /\.parts\.json$/i.test(a.name));
+      const parts = assets
+        .filter((a) => /\.part\d+$/i.test(a.name))
+        .sort((x, y) => x.name.localeCompare(y.name));
+      if (manifest && parts.length) {
+        found = { release, manifest, parts };
+        break;
+      }
+    }
+
+    if (!found) {
+      dialog.showMessageBox(win, {
+        type: 'info',
+        title: 'Обновление с GitHub',
+        message: 'Готовых сборок не найдено.',
+        detail: 'Попробуйте позже — новая версия ещё собирается.',
+      });
+      return;
+    }
+
+    const manifestJson = JSON.parse((await httpsGet(found.manifest.browser_download_url, { accept: '*/*' })).toString('utf8'));
+    const versionMatch = /(\d+\.\d+\.\d+)/.exec(manifestJson.file || '');
+    const remoteVersion = versionMatch ? versionMatch[1] : null;
+    const currentVersion = app.getVersion();
+
+    if (remoteVersion && compareVersions(remoteVersion, currentVersion) <= 0) {
+      const same = await dialog.showMessageBox(win, {
+        type: 'info',
+        title: 'Обновление с GitHub',
+        message: `У вас уже установлена версия ${currentVersion}.`,
+        detail: `На GitHub доступна версия ${remoteVersion}. Скачать и переустановить всё равно?`,
+        buttons: ['Скачать', 'Отмена'],
+        defaultId: 1,
+        cancelId: 1,
+        noLink: true,
+      });
+      if (same.response !== 0) return;
+    } else {
+      const confirm = await dialog.showMessageBox(win, {
+        type: 'info',
+        title: 'Доступна новая версия',
+        message: `Доступна версия ${remoteVersion || 'новее текущей'}.`,
+        detail: `Текущая версия: ${currentVersion}.\nСкачать ${found.parts.length} частей (${Math.round((manifestJson.totalBytes || 0) / 1048576)} МБ) и запустить установку?`,
+        buttons: ['Скачать и установить', 'Отмена'],
+        defaultId: 0,
+        cancelId: 1,
+        noLink: true,
+      });
+      if (confirm.response !== 0) return;
+    }
+
+    const targetDir = fs.mkdtempSync(path.join(os.tmpdir(), 'saro-update-'));
+    const installerPath = path.join(targetDir, manifestJson.file || 'SARO-Setup.exe');
+    const output = fs.createWriteStream(installerPath);
+    const hash = crypto.createHash('sha256');
+
+    for (let i = 0; i < found.parts.length; i += 1) {
+      const part = found.parts[i];
+      if (win && !win.isDestroyed()) {
+        win.setProgressBar((i + 1) / found.parts.length);
+        win.setTitle(`${APP_NAME} — загрузка обновления ${i + 1}/${found.parts.length}`);
+      }
+      const data = await httpsGet(part.browser_download_url, { accept: '*/*' });
+      hash.update(data);
+      output.write(data);
+    }
+
+    await new Promise((resolve, reject) => {
+      output.end(resolve);
+      output.on('error', reject);
+    });
+
+    if (win && !win.isDestroyed()) {
+      win.setProgressBar(-1);
+      win.setTitle(`${APP_NAME} v${app.getVersion()}`);
+    }
+
+    const checksum = hash.digest('hex');
+    if (manifestJson.sha256 && checksum !== manifestJson.sha256) {
+      dialog.showMessageBox(win, {
+        type: 'error',
+        title: 'Обновление с GitHub',
+        message: 'Файл обновления повреждён при загрузке.',
+        detail: 'Контрольная сумма не совпала. Попробуйте обновиться ещё раз.',
+      });
+      return;
+    }
+
+    const ready = await dialog.showMessageBox(win, {
+      type: 'info',
+      title: 'Обновление загружено',
+      message: 'Установщик готов.',
+      detail: 'Программа закроется и запустится установка новой версии.',
+      buttons: ['Установить сейчас', 'Показать файл'],
+      defaultId: 0,
+      cancelId: 1,
+      noLink: true,
+    });
+
+    if (ready.response === 0) {
+      await shell.openPath(installerPath);
+      setTimeout(() => app.quit(), 1500);
+    } else {
+      shell.showItemInFolder(installerPath);
+    }
+  } catch (error) {
+    if (win && !win.isDestroyed()) {
+      win.setProgressBar(-1);
+      win.setTitle(`${APP_NAME} v${app.getVersion()}`);
+    }
+    dialog.showMessageBox(win, {
+      type: 'error',
+      title: 'Обновление с GitHub',
+      message: 'Не удалось загрузить обновление.',
+      detail: error instanceof Error ? error.message : String(error),
+    });
+  } finally {
+    githubUpdateBusy = false;
+  }
+}
 
 function pathExists(filePath) {
   try {
@@ -87,6 +274,18 @@ function createMenu(win) {
                 detail: 'Программа продолжит работать в текущей версии.',
               });
             });
+          },
+        },
+        {
+          label: 'Обновить с GitHub',
+          click: () => {
+            updateFromGithub(win);
+          },
+        },
+        {
+          label: 'Открыть страницу релизов',
+          click: () => {
+            shell.openExternal(`https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases`);
           },
         },
         { type: 'separator' },
