@@ -14,10 +14,10 @@ import { HEATING_CABLES, THERMOSTATS as CATALOG_THERMOSTATS, CONTROL_CABINETS, M
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Check, AlertTriangle, ShieldCheck, Send, FileText, Printer } from "lucide-react";
 
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { type QuoteVariant, type QuoteData } from "@/lib/porch/generateQuote";
 import QuotePreviewDialog from "@/components/porch/QuotePreviewDialog";
+import { SafeDialog } from "@/components/porch/SafeDialog";
 
 const fmtNum = (n: number) => Math.round(Number(n) || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, "\u00A0");
 
@@ -1311,17 +1311,22 @@ const Calculator = () => {
       <div className="h-40 lg:h-0" />
 
       {/* Диалог выбора формата КП */}
-      <Dialog open={orderDialogOpen} onOpenChange={setOrderDialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
+      <SafeDialog
+        open={orderDialogOpen}
+        onOpenChange={setOrderDialogOpen}
+        className="max-w-md"
+        labelledBy="order-dialog-title"
+        describedBy="order-dialog-description"
+      >
+          <div>
+            <h2 id="order-dialog-title" className="flex items-center gap-2 text-lg font-semibold">
               <FileText className="h-5 w-5 text-primary" />
               Оформление заказа
-            </DialogTitle>
-            <DialogDescription>
+            </h2>
+            <p id="order-dialog-description" className="mt-1.5 text-sm text-muted-foreground">
               Выберите формат коммерческого предложения — оно откроется в окне предпросмотра, где можно скачать PDF или отправить на печать.
-            </DialogDescription>
-          </DialogHeader>
+            </p>
+          </div>
 
           <div className="space-y-2 mt-2">
             <button
@@ -1373,8 +1378,7 @@ const Calculator = () => {
           <Button variant="ghost" onClick={() => setOrderDialogOpen(false)} className="mt-2">
             Отмена
           </Button>
-        </DialogContent>
-      </Dialog>
+      </SafeDialog>
 
       {/* Предпросмотр КП с кнопками «Скачать PDF» и «Печать» */}
       <QuotePreviewDialog
