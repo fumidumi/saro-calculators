@@ -1,4 +1,4 @@
-name: Build macOS universal app
+name: Build macOS app
 
 on:
   workflow_dispatch:
@@ -17,7 +17,7 @@ on:
 
 jobs:
   build-macos:
-    name: Build universal DMG and ZIP
+    name: Build Intel and Apple Silicon DMG and ZIP
     runs-on: macos-15
     permissions:
       contents: write
@@ -43,35 +43,39 @@ jobs:
       - name: Prepare Electron output
         run: npm run prepare:electron-output
 
-      - name: Build universal macOS application
-        run: npx electron-builder --mac dmg zip --universal --publish never
+      - name: Build Intel and Apple Silicon applications
+        run: npx electron-builder --mac dmg zip --x64 --arm64 --publish never
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
 
       - name: Create SHA-256 checksums
         run: |
           cd release
-          shasum -a 256 SARO-Roof-1.0.13-mac-universal.dmg SARO-Roof-1.0.13-mac-universal.zip > SHA256SUMS-mac.txt
+          shasum -a 256 SARO-Roof-1.0.13-mac-x64.dmg SARO-Roof-1.0.13-mac-x64.zip SARO-Roof-1.0.13-mac-arm64.dmg SARO-Roof-1.0.13-mac-arm64.zip > SHA256SUMS-mac.txt
 
       - name: Upload macOS artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: saro-roof-macos-universal
+          name: saro-roof-macos
           path: |
-            release/SARO-Roof-1.0.13-mac-universal.dmg
-            release/SARO-Roof-1.0.13-mac-universal.zip
+            release/SARO-Roof-1.0.13-mac-x64.dmg
+            release/SARO-Roof-1.0.13-mac-x64.zip
+            release/SARO-Roof-1.0.13-mac-arm64.dmg
+            release/SARO-Roof-1.0.13-mac-arm64.zip
             release/SHA256SUMS-mac.txt
           if-no-files-found: error
 
       - name: Publish macOS release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: macos-universal-${{ github.run_number }}
-          name: SARO macOS universal 1.0.13
+          tag_name: macos-${{ github.run_number }}
+          name: SARO macOS 1.0.13
           body: |
-            Universal macOS build for Intel and Apple Silicon.
-            The application is ad-hoc signed and is not notarized by Apple.
+            Separate macOS builds for Intel (x64) and Apple Silicon (arm64).
+            The applications are ad-hoc signed and are not notarized by Apple.
           files: |
-            release/SARO-Roof-1.0.13-mac-universal.dmg
-            release/SARO-Roof-1.0.13-mac-universal.zip
+            release/SARO-Roof-1.0.13-mac-x64.dmg
+            release/SARO-Roof-1.0.13-mac-x64.zip
+            release/SARO-Roof-1.0.13-mac-arm64.dmg
+            release/SARO-Roof-1.0.13-mac-arm64.zip
             release/SHA256SUMS-mac.txt
