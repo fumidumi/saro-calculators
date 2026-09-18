@@ -8,7 +8,6 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import CableLayoutVisualization from "@/components/porch/CableLayoutVisualization";
-import CableLayout3D from "@/components/porch/CableLayout3DLazy";
 import SpacingOptimizationChart from "@/components/porch/SpacingOptimizationChart";
 import { HEATING_CABLES, THERMOSTATS as CATALOG_THERMOSTATS, CONTROL_CABINETS, MOUNTING_TAPES } from "@/data/products";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -445,8 +444,8 @@ const Calculator = () => {
     setParams((prev) => ({ ...prev, [key]: num }));
   };
 
-  // Debounce параметров для тяжёлых компонентов (3D/2D/график),
-  // чтобы при перетаскивании ползунка не пересоздавать сцену на каждый кадр.
+  // Debounce параметров для 2D-компонентов и графика,
+  // чтобы при перетаскивании ползунка не пересчитывать их на каждый кадр.
   const debouncedParams = useDebouncedValue(params, 180);
   const debouncedCableStep = useDebouncedValue(cableStep, 180);
   const debouncedNoStairs = useDebouncedValue(noStairs, 180);
@@ -454,29 +453,6 @@ const Calculator = () => {
   const vizStepCount = debouncedNoStairs ? 0 : debouncedParams.stepCount;
   const vizPlatformLength = debouncedNoPlatform ? 0 : debouncedParams.platformLength;
   const vizPlatformWidth = debouncedNoPlatform ? 0 : debouncedParams.platformWidth;
-
-  // Проверка корректности параметров для 3D-предпросмотра
-  const params3DError = (() => {
-    const stepLength = debouncedParams.stepLength;
-    const stepCount = vizStepCount;
-    const platformLength = vizPlatformLength;
-    const platformWidth = vizPlatformWidth;
-    const values = { stepLength, stepCount, platformLength, platformWidth, cableStep: debouncedCableStep };
-    const allFinite = Object.values(values).every((v) => Number.isFinite(v));
-    if (!allFinite) return { reason: "Параметры содержат NaN или Infinity", values };
-    if (stepLength <= 0) return { reason: "Ширина пролёта должна быть > 0", values };
-    if (stepCount < 0) return { reason: "Количество ступеней не может быть отрицательным", values };
-    if (platformLength < 0 || platformWidth < 0) return { reason: "Размеры площадки не могут быть отрицательными", values };
-    if (debouncedCableStep <= 0 && platformLength > 0 && platformWidth > 0) return { reason: "Шаг укладки кабеля должен быть > 0", values };
-    if (stepCount === 0 && (platformLength === 0 || platformWidth === 0)) return { reason: "Нужно включить хотя бы одну зону обогрева", values };
-    return null;
-  })();
-
-  useEffect(() => {
-    if (params3DError) {
-      console.error("[Calculator/3D] Некорректные параметры — 3D-предпросмотр отключён", params3DError);
-    }
-  }, [params3DError?.reason]);
 
   // Открытие диалога выбора формата КП
   const handleOrderClick = () => {
@@ -711,55 +687,16 @@ const Calculator = () => {
               </CardContent>
             </Card>
 
-            {/* Визуализация раскладки */}
-            <Tabs defaultValue="2d" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="2d">2D Схема</TabsTrigger>
-                <TabsTrigger value="3d">3D Модель</TabsTrigger>
-              </TabsList>
-              <TabsContent value="2d">
-                <CableLayoutVisualization
-                  stepLength={debouncedParams.stepLength}
-                  stepWidth={0.3}
-                  stepCount={vizStepCount}
-                  platformLength={vizPlatformLength}
-                  platformWidth={vizPlatformWidth}
-                  cableStep={debouncedCableStep}
-                  threadsPerStep={threadsPerStep}
-                />
-              </TabsContent>
-              <TabsContent value="3d">
-                {params3DError ? (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2 text-destructive">
-                        <AlertTriangle className="h-5 w-5" />
-                        3D-предпросмотр недоступен
-                      </CardTitle>
-                      <CardDescription>{params3DError.reason}</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <pre className="text-xs bg-muted p-3 rounded-md overflow-auto">
-{JSON.stringify(params3DError.values, null, 2)}
-                      </pre>
-                      <p className="text-sm text-muted-foreground mt-3">
-                        Скорректируйте параметры — 3D появится автоматически.
-                      </p>
-                    </CardContent>
-                  </Card>
-                ) : (
-                  <CableLayout3D
-                    stepLength={debouncedParams.stepLength}
-                    stepWidth={0.3}
-                    stepCount={vizStepCount}
-                    platformLength={vizPlatformLength}
-                    platformWidth={vizPlatformWidth}
-                    cableStep={debouncedCableStep}
-                    threadsPerStep={threadsPerStep}
-                  />
-                )}
-              </TabsContent>
-            </Tabs>
+            {/* Надёжная 2D-схема без WebGL/3D. */}
+            <CableLayoutVisualization
+              stepLength={debouncedParams.stepLength}
+              stepWidth={0.3}
+              stepCount={vizStepCount}
+              platformLength={vizPlatformLength}
+              platformWidth={vizPlatformWidth}
+              cableStep={debouncedCableStep}
+              threadsPerStep={threadsPerStep}
+            />
 
             {/* График оптимизации */}
             <SpacingOptimizationChart

@@ -61,24 +61,29 @@ async function run() {
   await win.loadFile(indexHtml, { hash: "/porch" });
   const before = await waitForCalculator(win);
 
-  if (before.bodyPointerEvents === "none" || before.rootPointerEvents === "none") {
-    throw new Error(`Интерфейс блокирует мышь: ${JSON.stringify(before)}`);
+  // Короткий тест сразу после отрисовки мог не заметить последующее зависание.
+  // Выдерживаем приложение и проверяем взаимодействие уже в устойчивом состоянии.
+  await sleep(20000);
+  const stable = await waitForCalculator(win);
+
+  if (stable.bodyPointerEvents === "none" || stable.rootPointerEvents === "none") {
+    throw new Error(`Интерфейс блокирует мышь: ${JSON.stringify(stable)}`);
   }
-  if (before.bodyInert || before.rootInert) {
-    throw new Error(`Интерфейс помечен inert: ${JSON.stringify(before)}`);
+  if (stable.bodyInert || stable.rootInert) {
+    throw new Error(`Интерфейс помечен inert: ${JSON.stringify(stable)}`);
   }
-  if (before.topTag !== "INPUT" || before.topType !== "checkbox") {
-    throw new Error(`Флажок перекрыт другим элементом: ${JSON.stringify(before)}`);
+  if (stable.topTag !== "INPUT" || stable.topType !== "checkbox") {
+    throw new Error(`Флажок перекрыт другим элементом: ${JSON.stringify(stable)}`);
   }
 
-  win.webContents.sendInputEvent({ type: "mouseMove", x: before.x, y: before.y });
-  win.webContents.sendInputEvent({ type: "mouseDown", x: before.x, y: before.y, button: "left", clickCount: 1 });
-  win.webContents.sendInputEvent({ type: "mouseUp", x: before.x, y: before.y, button: "left", clickCount: 1 });
+  win.webContents.sendInputEvent({ type: "mouseMove", x: stable.x, y: stable.y });
+  win.webContents.sendInputEvent({ type: "mouseDown", x: stable.x, y: stable.y, button: "left", clickCount: 1 });
+  win.webContents.sendInputEvent({ type: "mouseUp", x: stable.x, y: stable.y, button: "left", clickCount: 1 });
   await sleep(400);
 
   const after = await waitForCalculator(win);
-  if (after.checked === before.checked) {
-    throw new Error(`Настоящий клик мышью не изменил флажок: ${JSON.stringify({ before, after, errors })}`);
+  if (after.checked === stable.checked) {
+    throw new Error(`Настоящий клик мышью не изменил флажок: ${JSON.stringify({ before, stable, after, errors })}`);
   }
 
   win.webContents.sendInputEvent({ type: "keyDown", keyCode: "TAB" });
@@ -86,7 +91,7 @@ async function run() {
   await sleep(100);
   const activeTag = await win.webContents.executeJavaScript("document.activeElement?.tagName || null");
 
-  console.log("SARO_ELECTRON_SMOKE_OK", JSON.stringify({ before, after, activeTag, errors }));
+  console.log("SARO_ELECTRON_SMOKE_OK", JSON.stringify({ before, stable, after, activeTag, errors }));
   win.destroy();
   app.exit(0);
 }

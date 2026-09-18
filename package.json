@@ -1,7 +1,7 @@
 {
   "name": "saro-roof-mate",
   "productName": "SARO системы обогрева",
-  "version": "1.0.14",
+  "version": "1.0.15",
   "description": "Калькулятор систем обогрева SARO",
   "private": true,
   "sideEffects": false,
@@ -120,6 +120,7 @@
     },
     "files": [
       "electron-main.cjs",
+      "scripts/packaged-smoke.cjs",
       "package.json"
     ],
     "extraResources": [

@@ -9,6 +9,11 @@ const APP_NAME = 'SARO системы обогрева';
 const RELEASE_DATE = '18.09.2026';
 const UPDATE_CHANNEL = 'latest-roof';
 
+// Калькулятору не требуется WebGL. На части компьютеров GPU-процесс Chromium
+// зависал после запуска установленного приложения и блокировал весь ввод.
+// Используем стабильный программный рендеринг; 2D-схемы и расчёты сохраняются.
+app.disableHardwareAcceleration();
+
 // Автообновление напрямую из релизов GitHub: части установщика скачиваются
 // и склеиваются автоматически, пользователю не нужно ничего собирать вручную.
 const GITHUB_OWNER = 'fumidumi';
@@ -406,6 +411,13 @@ function createWindow() {
     win.focus();
   });
 
+  // Не даём HTML-странице скрыть номер установленной версии в заголовке окна.
+  // Это также позволяет сразу отличить новую копию приложения от старой.
+  win.webContents.on('page-title-updated', (event) => {
+    event.preventDefault();
+    win.setTitle(`${APP_NAME} v${app.getVersion()}`);
+  });
+
   // Внешние ссылки открываем в браузере, чтобы окно программы не зависало.
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:/i.test(url)) shell.openExternal(url);
@@ -432,7 +444,18 @@ function createWindow() {
     return win;
   }
 
-  win.loadFile(indexHtml).catch((error) => {
+  const loadPromise = win.loadFile(indexHtml);
+
+  if (process.env.SARO_PACKAGED_SMOKE === '1') {
+    loadPromise
+      .then(() => require('./scripts/packaged-smoke.cjs').runPackagedSmoke(win))
+      .catch((error) => {
+        console.error('SARO_PACKAGED_SMOKE_FAILED', error);
+        app.exit(1);
+      });
+  }
+
+  loadPromise.catch((error) => {
     showStartupError(win, error instanceof Error ? error.stack || error.message : String(error));
   });
 

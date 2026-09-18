@@ -1,13 +1,10 @@
-name: Build fixed desktop 1.0.14
+name: Build fixed desktop 1.0.15
 
 on:
   workflow_dispatch:
   push:
     branches:
       - codex/fix-porch-interaction-1.0.14
-
-permissions:
-  contents: write
 
 jobs:
   macos:
@@ -32,22 +29,18 @@ jobs:
         run: bunx electron-builder --mac dmg --arm64 --publish never
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
+      - name: Verify the packaged Apple Silicon application after soak
+        run: |
+          app_binary="$(find release/mac-arm64 -type f -path '*/Contents/MacOS/*' -perm +111 | head -n 1)"
+          test -n "$app_binary"
+          SARO_PACKAGED_SMOKE=1 "$app_binary"
       - name: Checksums
         run: shasum -a 256 release/*.dmg | tee release/SHA256SUMS-macos.txt
       - name: Upload workflow artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: saro-macos-1.0.14
+          name: saro-macos-1.0.15
           path: |
-            release/*.dmg
-            release/SHA256SUMS-macos.txt
-      - name: Publish macOS release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: fixed-1.0.14-macos-${{ github.run_number }}
-          name: SARO 1.0.14 macOS (fixed input)
-          body: Exact Lovable dependency lock; automated native mouse-click smoke test passed.
-          files: |
             release/*.dmg
             release/SHA256SUMS-macos.txt
 
@@ -69,22 +62,21 @@ jobs:
         run: bunx electron-builder --win nsis --x64 --publish never
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
+      - name: Verify the packaged Windows application after soak
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem "release/win-unpacked" -Filter "*.exe" | Select-Object -First 1
+          if (-not $exe) { throw "Packaged application not found" }
+          $env:SARO_PACKAGED_SMOKE = "1"
+          & $exe.FullName
+          if ($LASTEXITCODE -ne 0) { throw "Packaged smoke test failed with exit code $LASTEXITCODE" }
       - name: Checksums
         shell: pwsh
         run: Get-FileHash release/*.exe -Algorithm SHA256 | Format-Table -AutoSize | Out-File release/SHA256SUMS-windows.txt
       - name: Upload workflow artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: saro-windows-1.0.14
+          name: saro-windows-1.0.15
           path: |
-            release/*.exe
-            release/SHA256SUMS-windows.txt
-      - name: Publish Windows release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: fixed-1.0.14-windows-${{ github.run_number }}
-          name: SARO 1.0.14 Windows (fixed input)
-          body: Exact Lovable dependency lock; automated native mouse-click smoke test passed.
-          files: |
             release/*.exe
             release/SHA256SUMS-windows.txt
