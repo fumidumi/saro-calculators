@@ -140,6 +140,25 @@
       "artifactName": "SARO-Roof-${version}-Setup.${ext}",
       "requestedExecutionLevel": "asInvoker"
     },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "universal"
+          ]
+        }
+      ],
+      "artifactName": "SARO-Roof-${version}-mac-universal.${ext}",
+      "category": "public.app-category.utilities",
+      "identity": "-"
+    },
     "nsis": {
       "oneClick": false,
       "perMachine": false,
