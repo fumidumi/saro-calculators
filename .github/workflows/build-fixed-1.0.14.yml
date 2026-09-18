@@ -1,0 +1,90 @@
+name: Build fixed desktop 1.0.14
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - codex/fix-porch-interaction-1.0.14
+
+permissions:
+  contents: write
+
+jobs:
+  macos:
+    name: macOS DMG (Intel and Apple Silicon)
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - name: Install the exact locked dependencies
+        run: bun install --frozen-lockfile
+      - name: Build desktop interface
+        run: bun run build:desktop && bun run prepare:electron-output
+      - name: Verify real mouse and keyboard input
+        run: bun run smoke:electron
+      - name: Build Intel DMG
+        run: bunx electron-builder --mac dmg --x64 --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+      - name: Build Apple Silicon DMG
+        run: bunx electron-builder --mac dmg --arm64 --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+      - name: Checksums
+        run: shasum -a 256 release/*.dmg | tee release/SHA256SUMS-macos.txt
+      - name: Upload workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: saro-macos-1.0.14
+          path: |
+            release/*.dmg
+            release/SHA256SUMS-macos.txt
+      - name: Publish macOS release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: fixed-1.0.14-macos-${{ github.run_number }}
+          name: SARO 1.0.14 macOS (fixed input)
+          body: Exact Lovable dependency lock; automated native mouse-click smoke test passed.
+          files: |
+            release/*.dmg
+            release/SHA256SUMS-macos.txt
+
+  windows:
+    name: Windows installer
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - name: Install the exact locked dependencies
+        run: bun install --frozen-lockfile
+      - name: Build desktop interface
+        run: bun run build:desktop && bun run prepare:electron-output
+      - name: Verify real mouse and keyboard input
+        run: bun run smoke:electron
+      - name: Build installer
+        run: bunx electron-builder --win nsis --x64 --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+      - name: Checksums
+        shell: pwsh
+        run: Get-FileHash release/*.exe -Algorithm SHA256 | Format-Table -AutoSize | Out-File release/SHA256SUMS-windows.txt
+      - name: Upload workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: saro-windows-1.0.14
+          path: |
+            release/*.exe
+            release/SHA256SUMS-windows.txt
+      - name: Publish Windows release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: fixed-1.0.14-windows-${{ github.run_number }}
+          name: SARO 1.0.14 Windows (fixed input)
+          body: Exact Lovable dependency lock; automated native mouse-click smoke test passed.
+          files: |
+            release/*.exe
+            release/SHA256SUMS-windows.txt

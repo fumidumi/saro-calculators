@@ -1,7 +1,7 @@
 {
   "name": "saro-roof-mate",
   "productName": "SARO системы обогрева",
-  "version": "1.0.13",
+  "version": "1.0.14",
   "description": "Калькулятор систем обогрева SARO",
   "private": true,
   "sideEffects": false,
@@ -15,6 +15,7 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "test": "vitest run",
+    "smoke:electron": "electron scripts/electron-smoke.cjs",
     "prepare:electron-output": "node scripts/prepare-electron-output.cjs",
     "electron": "npm run build:desktop && npm run prepare:electron-output && electron .",
     "dist": "npm run build:desktop && npm run prepare:electron-output && electron-builder",
@@ -22,6 +23,11 @@
     "pack": "npm run build:desktop && npm run prepare:electron-output && electron-builder --dir",
     "build:desktop": "vite build --config vite.desktop.config.ts"
   },
+  "packageManager": "bun@1.4.2",
+  "trustedDependencies": [
+    "electron",
+    "electron-winstaller"
+  ],
   "dependencies": {
     "@cloudflare/vite-plugin": "^1.25.5",
     "@hookform/resolvers": "^5.2.2",
@@ -139,6 +145,21 @@
       ],
       "artifactName": "SARO-Roof-${version}-Setup.${ext}",
       "requestedExecutionLevel": "asInvoker"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "artifactName": "SARO-Roof-${version}-mac-${arch}.${ext}",
+      "category": "public.app-category.utilities",
+      "identity": "-",
+      "hardenedRuntime": false
     },
     "nsis": {
       "oneClick": false,
