@@ -58,7 +58,7 @@ async function run() {
     errors.push(`renderer stopped: ${details.reason}`);
   });
 
-  await win.loadFile(indexHtml);
+  await win.loadFile(indexHtml, { hash: "/porch" });
   const before = await waitForCalculator(win);
 
   if (before.bodyPointerEvents === "none" || before.rootPointerEvents === "none") {
