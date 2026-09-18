@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Download, Printer, Loader2 } from "lucide-react";
+import { SafeDialog } from "@/components/porch/SafeDialog";
 import {
   buildQuoteBodyHTML,
   printQuote,
@@ -43,14 +43,19 @@ const QuotePreviewDialog = ({ open, onOpenChange, quote }: QuotePreviewDialogPro
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-0 gap-0">
-        <DialogHeader className="p-6 pb-4 border-b">
-          <DialogTitle>Предпросмотр коммерческого предложения</DialogTitle>
-          <DialogDescription>
+    <SafeDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      className="max-h-[90vh] max-w-4xl gap-0 overflow-hidden p-0"
+      labelledBy="quote-preview-title"
+      describedBy="quote-preview-description"
+    >
+        <div className="border-b p-6 pb-4">
+          <h2 id="quote-preview-title" className="text-lg font-semibold">Предпросмотр коммерческого предложения</h2>
+          <p id="quote-preview-description" className="mt-1.5 text-sm text-muted-foreground">
             Проверьте содержимое и скачайте PDF или отправьте на печать.
-          </DialogDescription>
-        </DialogHeader>
+          </p>
+        </div>
 
         <div className="flex-1 overflow-auto bg-muted/30 p-4">
           <style>{QUOTE_STYLES}</style>
@@ -78,8 +83,7 @@ const QuotePreviewDialog = ({ open, onOpenChange, quote }: QuotePreviewDialogPro
             Скачать PDF
           </Button>
         </div>
-      </DialogContent>
-    </Dialog>
+    </SafeDialog>
   );
 };
 
