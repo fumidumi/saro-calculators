@@ -1,4 +1,4 @@
-name: Build fixed desktop 1.0.15
+name: Build localhost desktop 1.0.16
 
 on:
   workflow_dispatch:
@@ -39,7 +39,7 @@ jobs:
       - name: Upload workflow artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: saro-macos-1.0.15
+          name: saro-macos-1.0.16
           path: |
             release/*.dmg
             release/SHA256SUMS-macos.txt
@@ -76,7 +76,7 @@ jobs:
       - name: Upload workflow artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: saro-windows-1.0.15
+          name: saro-windows-1.0.16
           path: |
             release/*.exe
             release/SHA256SUMS-windows.txt

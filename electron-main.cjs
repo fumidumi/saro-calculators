@@ -2,6 +2,7 @@ const { app, BrowserWindow, Menu, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
+const http = require('http');
 const https = require('https');
 const crypto = require('crypto');
 
@@ -21,6 +22,8 @@ const GITHUB_REPO = 'saro-calculators';
 
 let mainWindow = null;
 let githubUpdateBusy = false;
+let localStaticServer = null;
+let localStaticBaseUrl = null;
 
 function escapeHtml(value) {
   return String(value)
@@ -307,6 +310,85 @@ function findIndexHtml() {
   return getIndexCandidates().find(pathExists) || null;
 }
 
+const STATIC_MIME_TYPES = {
+  '.css': 'text/css; charset=utf-8',
+  '.gif': 'image/gif',
+  '.html': 'text/html; charset=utf-8',
+  '.ico': 'image/x-icon',
+  '.jpeg': 'image/jpeg',
+  '.jpg': 'image/jpeg',
+  '.js': 'text/javascript; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.map': 'application/json; charset=utf-8',
+  '.mjs': 'text/javascript; charset=utf-8',
+  '.png': 'image/png',
+  '.svg': 'image/svg+xml',
+  '.webp': 'image/webp',
+  '.woff': 'font/woff',
+  '.woff2': 'font/woff2',
+};
+
+// Статический интерфейс отдаём через закрытый localhost вместо file://.
+// Так настольная версия работает в том же браузерном режиме, что и рабочая
+// веб-демоверсия, но остаётся полностью автономной и не использует интернет.
+function startLocalStaticServer(indexHtml) {
+  if (localStaticBaseUrl) return Promise.resolve(localStaticBaseUrl);
+
+  const webRoot = path.dirname(indexHtml);
+  const rootPrefix = `${path.resolve(webRoot)}${path.sep}`;
+
+  return new Promise((resolve, reject) => {
+    const server = http.createServer((request, response) => {
+      try {
+        const requestUrl = new URL(request.url || '/', 'http://127.0.0.1');
+        let relativePath = decodeURIComponent(requestUrl.pathname).replace(/^\/+/, '');
+        if (!relativePath) relativePath = 'index.html';
+
+        const requestedPath = path.resolve(webRoot, relativePath);
+        if (requestedPath !== path.resolve(indexHtml) && !requestedPath.startsWith(rootPrefix)) {
+          response.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
+          response.end('Forbidden');
+          return;
+        }
+
+        fs.readFile(requestedPath, (error, data) => {
+          if (error) {
+            response.writeHead(error.code === 'ENOENT' ? 404 : 500, {
+              'Content-Type': 'text/plain; charset=utf-8',
+            });
+            response.end(error.code === 'ENOENT' ? 'Not found' : 'Read error');
+            return;
+          }
+
+          const contentType = STATIC_MIME_TYPES[path.extname(requestedPath).toLowerCase()] || 'application/octet-stream';
+          response.writeHead(200, {
+            'Content-Type': contentType,
+            'Cache-Control': 'no-store',
+            'X-Content-Type-Options': 'nosniff',
+          });
+          response.end(data);
+        });
+      } catch (error) {
+        response.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
+        response.end(error instanceof Error ? error.message : 'Bad request');
+      }
+    });
+
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', () => {
+      const address = server.address();
+      if (!address || typeof address === 'string') {
+        server.close();
+        reject(new Error('Не удалось определить локальный адрес интерфейса'));
+        return;
+      }
+      localStaticServer = server;
+      localStaticBaseUrl = `http://127.0.0.1:${address.port}`;
+      resolve(localStaticBaseUrl);
+    });
+  });
+}
+
 function showStartupError(win, message) {
   const html = `<!doctype html><html lang="ru"><head><meta charset="utf-8">
   <style>body{font-family:Segoe UI,Arial,sans-serif;background:#f8fafc;color:#0f172a;padding:40px;line-height:1.6}
@@ -444,7 +526,7 @@ function createWindow() {
     return win;
   }
 
-  const loadPromise = win.loadFile(indexHtml);
+  const loadPromise = startLocalStaticServer(indexHtml).then((baseUrl) => win.loadURL(`${baseUrl}/index.html`));
 
   if (process.env.SARO_PACKAGED_SMOKE === '1') {
     loadPromise
@@ -494,5 +576,13 @@ app.whenReady().then(() => {
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
+  }
+});
+
+app.on('before-quit', () => {
+  if (localStaticServer) {
+    localStaticServer.close();
+    localStaticServer = null;
+    localStaticBaseUrl = null;
   }
 });
