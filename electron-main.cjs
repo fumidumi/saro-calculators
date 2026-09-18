@@ -1,5 +1,4 @@
-const { app, BrowserWindow, Menu, dialog, shell } = require('electron');
-const { autoUpdater } = require('electron-updater');
+const { app, BrowserWindow, Menu, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -17,6 +16,77 @@ const GITHUB_REPO = 'saro-calculators';
 
 let mainWindow = null;
 let githubUpdateBusy = false;
+
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function showAppMessage(parent, options) {
+  return new Promise((resolve) => {
+    const buttons = options.buttons && options.buttons.length ? options.buttons : ['OK'];
+    const cancelId = Number.isInteger(options.cancelId) ? options.cancelId : buttons.length - 1;
+    const messageWindow = new BrowserWindow({
+      width: 520,
+      height: 300,
+      minWidth: 440,
+      minHeight: 240,
+      show: false,
+      parent: parent && !parent.isDestroyed() ? parent : undefined,
+      modal: false,
+      minimizable: false,
+      maximizable: false,
+      resizable: false,
+      title: options.title || APP_NAME,
+      backgroundColor: '#f8fafc',
+      webPreferences: {
+        contextIsolation: true,
+        nodeIntegration: false,
+        sandbox: true,
+      },
+    });
+
+    let settled = false;
+    const finish = (response) => {
+      if (settled) return;
+      settled = true;
+      resolve({ response });
+      if (!messageWindow.isDestroyed()) messageWindow.close();
+    };
+
+    const buttonHtml = buttons
+      .map(
+        (label, index) =>
+          `<a class="button${index === options.defaultId ? ' primary' : ''}" href="saro-dialog://choice/${index}">${escapeHtml(label)}</a>`,
+      )
+      .join('');
+    const html = `<!doctype html><html lang="ru"><head><meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      <style>
+        *{box-sizing:border-box}body{margin:0;font-family:Segoe UI,Arial,sans-serif;background:#f8fafc;color:#172033;padding:28px;line-height:1.45}
+        h1{font-size:20px;margin:0 0 14px}p{font-size:14px;margin:0 0 10px;white-space:pre-wrap}.detail{color:#526071}
+        .actions{display:flex;justify-content:flex-end;gap:10px;margin-top:26px}.button{display:inline-flex;align-items:center;justify-content:center;min-height:38px;padding:8px 16px;border:1px solid #b9c2ce;border-radius:6px;color:#172033;text-decoration:none;background:#fff;font-weight:600}.button.primary{background:#c92f32;border-color:#c92f32;color:#fff}
+      </style></head><body><h1>${escapeHtml(options.message || options.title || APP_NAME)}</h1>
+      ${options.detail ? `<p class="detail">${escapeHtml(options.detail)}</p>` : ''}<div class="actions">${buttonHtml}</div></body></html>`;
+
+    messageWindow.webContents.on('will-navigate', (event, url) => {
+      if (!url.startsWith('saro-dialog://choice/')) return;
+      event.preventDefault();
+      const response = Number.parseInt(url.slice('saro-dialog://choice/'.length), 10);
+      finish(Number.isInteger(response) ? response : cancelId);
+    });
+    messageWindow.on('closed', () => finish(cancelId));
+    messageWindow.once('ready-to-show', () => {
+      messageWindow.show();
+      messageWindow.focus();
+    });
+    messageWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
+  });
+}
 
 function httpsGet(url, options = {}) {
   return new Promise((resolve, reject) => {
@@ -86,7 +156,7 @@ async function updateFromGithub(win) {
     }
 
     if (!found) {
-      dialog.showMessageBox(win, {
+      await showAppMessage(win, {
         type: 'info',
         title: 'Обновление с GitHub',
         message: 'Готовых сборок не найдено.',
@@ -101,7 +171,7 @@ async function updateFromGithub(win) {
     const currentVersion = app.getVersion();
 
     if (remoteVersion && compareVersions(remoteVersion, currentVersion) <= 0) {
-      const same = await dialog.showMessageBox(win, {
+      const same = await showAppMessage(win, {
         type: 'info',
         title: 'Обновление с GitHub',
         message: `У вас уже установлена версия ${currentVersion}.`,
@@ -113,7 +183,7 @@ async function updateFromGithub(win) {
       });
       if (same.response !== 0) return;
     } else {
-      const confirm = await dialog.showMessageBox(win, {
+      const confirm = await showAppMessage(win, {
         type: 'info',
         title: 'Доступна новая версия',
         message: `Доступна версия ${remoteVersion || 'новее текущей'}.`,
@@ -154,7 +224,7 @@ async function updateFromGithub(win) {
 
     const checksum = hash.digest('hex');
     if (manifestJson.sha256 && checksum !== manifestJson.sha256) {
-      dialog.showMessageBox(win, {
+      await showAppMessage(win, {
         type: 'error',
         title: 'Обновление с GitHub',
         message: 'Файл обновления повреждён при загрузке.',
@@ -163,7 +233,7 @@ async function updateFromGithub(win) {
       return;
     }
 
-    const ready = await dialog.showMessageBox(win, {
+    const ready = await showAppMessage(win, {
       type: 'info',
       title: 'Обновление загружено',
       message: 'Установщик готов.',
@@ -185,7 +255,7 @@ async function updateFromGithub(win) {
       win.setProgressBar(-1);
       win.setTitle(`${APP_NAME} v${app.getVersion()}`);
     }
-    dialog.showMessageBox(win, {
+    await showAppMessage(win, {
       type: 'error',
       title: 'Обновление с GitHub',
       message: 'Не удалось загрузить обновление.',
@@ -255,24 +325,11 @@ function createMenu(win) {
         {
           label: 'Информация',
           click: () => {
-            dialog.showMessageBox(win, {
+            showAppMessage(win, {
               type: 'info',
               title: 'О программе',
               message: APP_NAME,
               detail: `Версия: ${version}\nДата релиза: ${RELEASE_DATE}\nКанал обновлений: ${UPDATE_CHANNEL}\n\nКалькулятор систем обогрева SARO.`,
-            });
-          },
-        },
-        {
-          label: 'Проверить обновления',
-          click: () => {
-            autoUpdater.checkForUpdates().catch(() => {
-              dialog.showMessageBox(win, {
-                type: 'info',
-                title: 'Обновления',
-                message: 'Сервер обновлений недоступен.',
-                detail: 'Программа продолжит работать в текущей версии.',
-              });
             });
           },
         },
@@ -387,67 +444,22 @@ function createWindow() {
   return win;
 }
 
-function setupAutoUpdates() {
-  if (!app.isPackaged) return;
+const hasSingleInstanceLock = app.requestSingleInstanceLock();
 
-  autoUpdater.channel = UPDATE_CHANNEL;
-  // Не запускаем фоновую проверку и загрузку автоматически. В Windows
-  // системное окно electron-updater может оказаться за главным окном и
-  // полностью перехватить мышь. Проверка остаётся доступна вручную в меню.
-  autoUpdater.autoDownload = false;
-  autoUpdater.autoInstallOnAppQuit = true;
-
-  autoUpdater.on('error', () => {
-    // Ошибки обновления не должны мешать работе калькулятора.
-  });
-
-  autoUpdater.on('update-available', () => {
+if (!hasSingleInstanceLock) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
     if (!mainWindow || mainWindow.isDestroyed()) return;
-
-    dialog
-      .showMessageBox(mainWindow, {
-        type: 'info',
-        title: 'Доступно обновление',
-        message: 'Доступна новая версия SARO системы обогрева.',
-        detail: 'Загрузить обновление сейчас?',
-        buttons: ['Загрузить', 'Позже'],
-        defaultId: 1,
-        cancelId: 1,
-        noLink: true,
-      })
-      .then((result) => {
-        if (result.response === 0) {
-          return autoUpdater.downloadUpdate();
-        }
-        return undefined;
-      })
-      .catch(() => {});
-  });
-
-  autoUpdater.on('update-downloaded', () => {
-    if (!mainWindow || mainWindow.isDestroyed()) return;
-
-    dialog
-      .showMessageBox(mainWindow, {
-        type: 'info',
-        title: 'Обновление готово',
-        message: 'Обновление загружено.',
-        detail: 'Установить его сейчас?',
-        buttons: ['Установить сейчас', 'Позже'],
-        defaultId: 1,
-        cancelId: 1,
-        noLink: true,
-      })
-      .then((result) => {
-        if (result.response === 0) autoUpdater.quitAndInstall();
-      })
-      .catch(() => {});
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.show();
+    mainWindow.focus();
   });
 }
 
 app.whenReady().then(() => {
+  if (!hasSingleInstanceLock) return;
   createWindow();
-  setupAutoUpdates();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
