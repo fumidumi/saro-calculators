@@ -25,6 +25,13 @@ declare module "@tanstack/react-router" {
 const rootElement = document.getElementById("root");
 
 if (rootElement) {
+  // Окна сторонних компонентов могут аварийно оставить страницу недоступной
+  // для мыши и клавиатуры. Настольная версия всегда начинает с чистого UI.
+  document.body.style.removeProperty("pointer-events");
+  document.body.removeAttribute("inert");
+  rootElement.removeAttribute("inert");
+  rootElement.removeAttribute("aria-hidden");
+
   createRoot(rootElement).render(
     <StrictMode>
       <RouterProvider router={router} />
